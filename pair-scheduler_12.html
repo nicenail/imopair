@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相モデル ペア自動生成｜NICENAIL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EFEAE2;
+    --surface: #FBF9F5;
+    --surface-2: #E5DFD4;
+    --ink: #2A1F22;
+    --ink-soft: #5A4C4F;
+    --line: #D3CAB9;
+    --wine: #6B2B3C;
+    --wine-deep: #4E1F2C;
+    --teal: #3F6B63;
+    --amber: #A85A2A;
+    --danger: #B03A2E;
+    --radius: 10px;
+    font-size: 16px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    line-height: 1.6;
+    padding: 0 0 80px;
+  }
+  a{ color: var(--wine); }
+
+  header.top{
+    padding: 40px 24px 28px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  header.top .eyebrow{
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    color: var(--wine);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  header.top h1{
+    font-family: 'Shippori Mincho', serif;
+    font-size: clamp(1.6rem, 4vw, 2.3rem);
+    font-weight: 700;
+    margin: 6px 0 10px;
+    color: var(--wine-deep);
+    cursor: default; user-select: none;
+  }
+  header.top p.sub{
+    color: var(--ink-soft);
+    max-width: 640px;
+    font-size: 0.95rem;
+    margin: 0;
+  }
+  .divider{
+    width: 100%;
+    height: 10px;
+    margin: 22px 0 0;
+  }
+
+  main{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+  .card h2{
+    font-family: 'Shippori Mincho', serif;
+    font-size: 1.05rem;
+    margin: 0 0 4px;
+    color: var(--wine-deep);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .card h2 .num{
+    font-size: 0.75rem;
+    color: var(--wine);
+    border: 1px solid var(--wine);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-weight: 700;
+  }
+  .card p.hint{
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+
+  .row-flex{
+    display:flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .field{
+    display:flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .field input[type=number], .field input[type=text]{
+    width: 90px;
+  }
+  input, select{
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  input:focus, select:focus, button:focus, summary:focus{
+    outline: 2px solid var(--wine);
+    outline-offset: 1px;
+  }
+
+  table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th{
+    text-align: left;
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  td{
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  tr:last-child td{ border-bottom: none; }
+
+  td input[type=text]{ width: 100%; min-width: 100px; }
+  td input[type=number]{ width: 80px; }
+
+  .btn{
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--wine);
+    background: var(--wine);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.08s ease, opacity 0.15s ease;
+  }
+  .btn:hover{ opacity: 0.9; }
+  .btn:active{ transform: scale(0.98); }
+  .btn.ghost{
+    background: transparent;
+    color: var(--wine);
+  }
+  .btn.small{
+    padding: 4px 12px;
+    font-size: 0.78rem;
+  }
+  .btn.remove{
+    background: transparent;
+    border-color: var(--line);
+    color: var(--ink-soft);
+  }
+  .btn.remove:hover{ border-color: var(--danger); color: var(--danger); }
+  .btn.danger{
+    background: var(--danger);
+    border-color: var(--danger);
+  }
+  .btn.generate{
+    font-size: 1rem;
+    padding: 12px 28px;
+    width: 100%;
+  }
+  .btn:disabled{ opacity: 0.5; cursor: not-allowed; }
+
+  details.ng{
+    font-size: 0.82rem;
+  }
+  details.ng summary{
+    cursor: pointer;
+    color: var(--wine);
+    font-weight: 700;
+    list-style: none;
+  }
+  details.ng summary::-webkit-details-marker{ display:none; }
+  details.ng .panel{
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 260px;
+  }
+  details.ng label{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+  }
+
+  .actions-row{
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .teacher-only{ display: none; }
+  body.teacher-mode .teacher-only{ display: block; }
+  .mode-badge{
+    display: inline-block;
+    margin-left: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-soft);
+    vertical-align: middle;
+  }
+  body.teacher-mode .mode-badge{
+    background: var(--wine);
+    color: #fff;
+  }
+  body.teacher-mode #teacherOffHint{ display: none; }
+
+  /* self-entry form */
+  .self-entry{
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .self-entry .status-pill{
+    display:inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--teal);
+    color:#fff;
+    margin-bottom: 8px;
+  }
+  .roster-list{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .roster-row{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+    flex-wrap: wrap;
+  }
+  .roster-row .who{ font-weight: 700; color: var(--wine-deep); }
+  .roster-row .meta{ color: var(--ink-soft); font-size: 0.8rem; }
+  .roster-row .mine-badge{
+    font-size: 0.68rem;
+    background: var(--wine);
+    color:#fff;
+    border-radius: 999px;
+    padding: 1px 8px;
+    margin-left: 6px;
+  }
+
+  .banner{
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+  .banner.error{ background:#F6DEDA; color: var(--danger); border:1px solid #E9BEB6; }
+  .banner.info{ background:#E1EBE8; color: var(--teal); border:1px solid #C9DBD6; }
+
+  /* results */
+  #resultsSection{ display: none; }
+  .summary-bar{
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .summary-bar strong{ color: var(--wine-deep); }
+
+  .pair-card{
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .pair-card .pair-title{
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 700;
+    color: var(--wine-deep);
+    font-size: 1.02rem;
+    margin: 0 0 4px;
+  }
+  .pair-card .pair-meta{
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  .cycle-line{
+    font-size: 0.86rem;
+    margin: 2px 0;
+  }
+  .cycle-line .role{
+    display:inline-block;
+    min-width: 78px;
+    font-weight: 700;
+    color: var(--wine);
+  }
+
+  .timebar-wrap{
+    margin-top: 12px;
+  }
+  .timebar{
+    position: relative;
+    height: 26px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface-2);
+    display: flex;
+  }
+  .timebar .seg{
+    height: 100%;
+  }
+  .timebar .seg.tech{ background: var(--wine); }
+  .timebar .seg.fb{ background: var(--teal); }
+  .timebar .seg.overflow{
+    background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 6px, #fff0 6px, #fff0 12px);
+  }
+  .timebar-boundary{
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: var(--ink);
+  }
+  .timebar-legend{
+    display:flex;
+    gap: 14px;
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .timebar-legend span{ display:flex; align-items:center; gap:5px; }
+  .swatch{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  .warn{
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+  .warn.ng-warn{ background: #F5E3D8; color: var(--amber); border: 1px solid #E4C6A8; }
+  .warn.time-warn{ background: #F6DEDA; color: var(--danger); border: 1px solid #E9BEB6; }
+  .warn.ok{ background: #E1EBE8; color: var(--teal); border: 1px solid #C9DBD6; }
+
+  .leftover-card{
+    border: 1px dashed var(--danger);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    background: #FBF3F1;
+    color: var(--danger);
+    font-size: 0.88rem;
+  }
+
+  footer.note{
+    max-width: 980px;
+    margin: 30px auto 0;
+    padding: 0 24px;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+  @media (max-width: 640px){
+    .row-flex{ flex-direction: column; gap: 10px; }
+    table, thead, tbody, tr, td{ display: block; width: 100%; }
+    thead{ display: none; }
+    tr{ border-bottom: 1px solid var(--line); padding: 8px 0; }
+    td{ border: none; padding: 4px 0; }
+    td::before{
+      content: attr(data-label);
+      display: block;
+      font-size: 0.72rem;
+      color: var(--ink-soft);
+      margin-bottom: 2px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">NICENAIL 校舎ツール</div>
+  <h1 id="pageTitle">相モデル ペア自動生成<span class="mode-badge" id="modeBadge">生徒モード</span></h1>
+  <p class="sub">授業1コマの持ち時間に、施術＋講師チェック／フィードバックを収めながら、NGプログラムの組み合わせはできる限り避けてペアや3人組を自動で組みます。プログラムマスタだけはSupabaseに保存され、生徒の名前やNG情報はこの端末の中だけで扱われ、外部には送信されません。</p>
+</header>
+<svg class="divider" viewBox="0 0 980 10" preserveAspectRatio="none">
+  <path d="M0,5 Q245,0 490,5 T980,5" stroke="#6B2B3C" stroke-width="2" fill="none" opacity="0.55"/>
+</svg>
+
+<main>
+
+  <div id="configBanner"></div>
+
+  <div class="teacher-only" id="teacherOnlyArea">
+  <section class="card">
+    <h2><span class="num">1</span>授業設定</h2>
+    <p class="hint">1コマの合計時間と、施術1回ごとの講師チェック／フィードバックにかける時間を設定します（この設定は保存されず、この端末だけで使われます）。</p>
+    <div class="row-flex">
+      <label class="field">1コマの合計時間（分）
+        <input type="number" id="sessionMinutes" value="180" min="10" step="5">
+      </label>
+      <label class="field">チェック／FB時間（1回あたり・分）
+        <input type="number" id="feedbackMinutes" value="15" min="0" step="5">
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2</span>特記事項タグ<span class="mode-badge" id="tagSyncBadge" style="background:var(--surface-2); color:var(--ink-soft);">同期待ち</span></h2>
+    <p class="hint">「アセトンNG」のような体質・特記事項のタグを登録してください。プログラム側で「このプログラムはこのタグを使う」と紐づけておくと、生徒がタグを1つ選ぶだけで、そのタグを使う全プログラムが自動でNG判定されます（プログラムが増えても選び直す必要がありません）。</p>
+    <table id="tagTable">
+      <thead>
+        <tr><th style="width:70%">タグ名</th><th></th></tr>
+      </thead>
+      <tbody id="tagTbody"></tbody>
+    </table>
+    <div class="actions-row">
+      <button class="btn ghost small" id="refreshTagsBtn" type="button">🔄 再読み込み</button>
+      <button class="btn ghost small" id="addTagBtn" type="button">＋ タグを追加</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3</span>プログラムマスタ<span class="mode-badge" id="programSyncBadge" style="background:var(--surface-2); color:var(--ink-soft);">同期待ち</span></h2>
+    <p class="hint">ここに登録した内容はSupabaseに保存され、次回以降も引き継がれます。「Bパターン時間」は3人組の片手/片足施術用の時間で、空欄なら標準時間の自動半分になります。「Bパターン不可」にチェックすると、フット施術のように2人同時での片手/片足ずつの施術ができないプログラムを、3人組のBパターンから除外します（その場合は2人ペア、または3人組でもAパターン＝順番に1対1になります）。「使用する特記事項タグ」は、このプログラムがどの特記事項に該当するか（例：アセトンを使う）を選んでください。</p>
+    <table id="programTable">
+      <thead>
+        <tr><th style="width:25%">プログラム名</th><th>標準時間（分）</th><th>Bパターン時間（分・任意）</th><th>Bパターン不可</th><th>使用する特記事項タグ</th><th></th></tr>
+      </thead>
+      <tbody id="programTbody"></tbody>
+    </table>
+    <div class="actions-row">
+      <button class="btn ghost small" id="refreshProgramsBtn" type="button">🔄 再読み込み</button>
+      <button class="btn ghost small" id="addProgramBtn" type="button">＋ プログラムを追加</button>
+    </div>
+  </section>
+  </div>
+
+  <section class="card">
+    <h2><span class="num">4</span>生徒情報の入力（この端末を順番に回してください）</h2>
+    <p class="hint">1人ずつ、この画面で名前・実施するプログラム・特記事項（できれば避けたいタグ）を入力して「送信する」を押してください。送信すると一覧に追加され、フォームは次の人のために空になります。この情報はネットには送信されず、この端末のブラウザの中だけで保持されます。</p>
+    <div class="self-entry" id="selfEntryArea">
+      <div id="selfEntryStatus"></div>
+      <div class="row-flex" style="align-items:flex-end;">
+        <label class="field" style="min-width:160px;">名前
+          <input type="text" id="selfName" placeholder="生徒名">
+        </label>
+        <label class="field" style="min-width:220px;">実施プログラム
+          <select id="selfProgram"></select>
+        </label>
+        <label class="field">特記事項（NG）
+          <details class="ng">
+            <summary>特記事項を選ぶ <span class="ngCount" id="selfNgCount">(0)</span></summary>
+            <div class="panel ngPanel" id="selfNgPanel"></div>
+          </details>
+        </label>
+        <button class="btn" id="selfSubmitBtn" type="button">送信する</button>
+      </div>
+    </div>
+
+    <p class="hint" style="margin-bottom:6px;">現在の入力状況（削除は講師モードのみ操作できます）</p>
+    <div class="roster-list" id="rosterList"></div>
+
+    <div class="teacher-only actions-row" style="justify-content: space-between; align-items:center;">
+      <button class="btn ghost small" id="teacherAddBtn" type="button">＋ 講師が代理で追加</button>
+      <button class="btn danger small" id="resetSessionBtn" type="button">生徒データをリセット（新しい授業を開始）</button>
+    </div>
+  </section>
+
+  <div class="teacher-only">
+    <button class="btn generate" id="generateBtn" type="button">ペアを自動生成する</button>
+    <p class="hint" id="validationMsg" style="color:#B03A2E; display:none;"></p>
+  </div>
+  <p class="hint teacher-off-hint" id="teacherOffHint">結果は講師が生成すると、ここに表示されます。</p>
+
+  <section class="card" id="resultsSection">
+    <h2><span class="num">5</span>生成結果</h2>
+    <p class="hint" id="resultsGeneratedAt"></p>
+    <div class="summary-bar" id="summaryBar"></div>
+    <div id="resultsBody"></div>
+  </section>
+
+</main>
+
+<footer class="note teacher-only">
+  ※ 組み合わせの優先順位は「授業時間に収まること」を最優先にし、NGプログラムの回避はその次に考慮します。NGは「できれば避けたい」設定として扱われ、時間内に収める上でやむを得ない場合は組み合わされることがあります。その場合はグループごとに注意表示されます。人数が奇数の場合は自動で3人組（Aパターン＝順番に1対1を3巡／Bパターン＝2人が同時に片手ずつ施術）を編成し、必ず全員が組まれるようにします。<br>
+  ※ Supabaseに保存されるのはプログラムマスタ（プログラム名・時間）だけです。生徒の名前・NG情報・生成結果はこの端末のブラウザ内だけで扱われ、ページを閉じるか「生徒データをリセット」を押すと消えます。他の端末とは共有されません。<br>
+  ※ このツールにはログイン機能がありません。講師専用エリアはタイトルの5回連続タップ、または <code>?teacher=1</code> を付けたURLで表示を切り替えているだけの簡易的な仕組みです。
+</footer>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  // ------------------------------------------------------------------
+  // 設定：新しく作成したSupabaseプロジェクトの URL と anon public key を
+  // ここに貼り付けてください（Project Settings > API から取得できます）。
+  // ------------------------------------------------------------------
+  const SUPABASE_URL = 'https://bwzoiuscebcflhvvgbui.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3em9pdXNjZWJjZmxodnZnYnVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1OTY4NDAsImV4cCI6MjEwMDE3Mjg0MH0.eH3VqFHvzYZFVuVx9Qno2O24dKLwlEpw2xAWIQH0F-k';
+
+  const configBanner = document.getElementById('configBanner');
+  let supabase = null;
+  let supabaseReady = false;
+
+  if(SUPABASE_URL.startsWith('YOUR_') || SUPABASE_ANON_KEY.startsWith('YOUR_')){
+    configBanner.innerHTML = `<div class="banner error">Supabaseの接続設定がまだです。HTMLファイル内の SUPABASE_URL と SUPABASE_ANON_KEY を、新しく作成したSupabaseプロジェクトの値に書き換えてから使ってください。</div>`;
+  } else {
+    try{
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabaseReady = true;
+    }catch(e){
+      configBanner.innerHTML = `<div class="banner error">Supabaseへの接続に失敗しました：${e.message}</div>`;
+    }
+  }
+
+  // ---- teacher / student mode ----
+  const modeBadge = document.getElementById('modeBadge');
+  const teacherOffHint = document.getElementById('teacherOffHint');
+
+  function setTeacherMode(on){
+    document.body.classList.toggle('teacher-mode', on);
+    modeBadge.textContent = on ? '講師モード' : '生徒モード';
+  }
+  const urlParams = new URLSearchParams(location.search);
+  setTeacherMode(urlParams.get('teacher') === '1');
+
+  let tapCount = 0, tapTimer = null;
+  document.getElementById('pageTitle').addEventListener('click', ()=>{
+    tapCount++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(()=>{ tapCount = 0; }, 1500);
+    if(tapCount >= 5){
+      tapCount = 0;
+      setTeacherMode(!document.body.classList.contains('teacher-mode'));
+    }
+  });
+
+  // ---------- state ----------
+  let programs = [];        // [{id, name, duration, half_override, sort_order, tag_ids}]  -- persisted in Supabase
+  let tags = [];             // [{id, name, sort_order}]  -- persisted in Supabase (special-notes tags, e.g. アセトンNG対象)
+  let sessionStudents = [];  // [{id, name, program_id, ng_tag_ids}]  -- local only, never sent to the network
+  let sessionSeq = 1;
+
+  const programTbody = document.getElementById('programTbody');
+  const programSyncBadge = document.getElementById('programSyncBadge');
+  const tagTbody = document.getElementById('tagTbody');
+  const tagSyncBadge = document.getElementById('tagSyncBadge');
+  const rosterList = document.getElementById('rosterList');
+  const selfProgramSelect = document.getElementById('selfProgram');
+  const selfNgPanel = document.getElementById('selfNgPanel');
+  const selfNgCount = document.getElementById('selfNgCount');
+  const selfNgSelected = new Set(); // selected tag ids
+  const selfEntryStatus = document.getElementById('selfEntryStatus');
+  const selfSubmitBtn = document.getElementById('selfSubmitBtn');
+  const selfNameInput = document.getElementById('selfName');
+
+  function escapeAttr(str){
+    return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  }
+  function escapeHtml(str){ return escapeAttr(str); }
+
+  function autoHalf(duration){ return Math.round(duration/2); }
+  function getHalfDuration(p){
+    return (p.half_override !== null && p.half_override !== undefined && p.half_override > 0)
+      ? p.half_override
+      : autoHalf(p.duration);
+  }
+
+  // ---------- Special-notes tags (Supabase-backed) ----------
+  async function loadTags(){
+    if(!supabaseReady) return;
+    const { data, error } = await supabase.from('tags').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true });
+    if(error){
+      tagSyncBadge.textContent = '読み込みエラー';
+      console.error(error);
+      return;
+    }
+    tags = data || [];
+    tagSyncBadge.textContent = '同期済み';
+    tagSyncBadge.style.background = 'var(--teal)';
+    tagSyncBadge.style.color = '#fff';
+    renderTagTable();
+    renderProgramTable();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  function renderTagTable(){
+    tagTbody.innerHTML = '';
+    tags.forEach(t=>{
+      const tr = document.createElement('tr');
+      tr.dataset.id = t.id;
+      tr.innerHTML = `
+        <td data-label="タグ名"><input type="text" class="tagName" value="${escapeAttr(t.name)}" placeholder="例）アセトンNG対象"></td>
+        <td><button class="btn remove small" type="button">削除</button></td>
+      `;
+      const nameInput = tr.querySelector('.tagName');
+      let saveTimer = null;
+      nameInput.addEventListener('input', ()=>{
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(()=>saveTag(t.id, { name: nameInput.value }), 500);
+      });
+      tr.querySelector('.btn.remove').addEventListener('click', ()=>deleteTag(t.id));
+      tagTbody.appendChild(tr);
+    });
+  }
+
+  async function saveTag(id, fields){
+    const { error } = await supabase.from('tags').update(fields).eq('id', id);
+    if(error){ console.error(error); return; }
+    const idx = tags.findIndex(t=>t.id===id);
+    if(idx>-1) tags[idx] = { ...tags[idx], ...fields };
+    renderProgramTable();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  async function deleteTag(id){
+    const { error } = await supabase.from('tags').delete().eq('id', id);
+    if(error){ console.error(error); return; }
+    tags = tags.filter(t=>t.id!==id);
+    // Clean up references in programs and the current self-entry selection.
+    programs.forEach(p=>{ p.tag_ids = (p.tag_ids||[]).filter(id2=>id2!==id); });
+    selfNgSelected.delete(id);
+    sessionStudents.forEach(s=>{ s.ng_tag_ids = (s.ng_tag_ids||[]).filter(id2=>id2!==id); });
+    renderTagTable();
+    renderProgramTable();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  document.getElementById('addTagBtn').addEventListener('click', async ()=>{
+    if(!supabaseReady) return;
+    const sortOrder = tags.length;
+    const { data, error } = await supabase.from('tags').insert({ name:'', sort_order: sortOrder }).select().single();
+    if(error){ console.error(error); return; }
+    tags.push(data);
+    renderTagTable();
+    renderProgramTable();
+    renderSelfNgPanel();
+  });
+
+  document.getElementById('refreshTagsBtn').addEventListener('click', loadTags);
+  document.getElementById('refreshProgramsBtn').addEventListener('click', loadPrograms);
+
+  // ---------- Program master (Supabase-backed) ----------
+  async function loadPrograms(){
+    if(!supabaseReady) return;
+    const { data, error } = await supabase.from('programs').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true });
+    if(error){
+      programSyncBadge.textContent = '読み込みエラー';
+      console.error(error);
+      return;
+    }
+    programs = data || [];
+    programSyncBadge.textContent = '同期済み';
+    programSyncBadge.style.background = 'var(--teal)';
+    programSyncBadge.style.color = '#fff';
+    renderProgramTable();
+    populateSelfProgramSelect();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  function renderProgramTable(){
+    programTbody.innerHTML = '';
+    programs.forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.dataset.id = p.id;
+      const tagIds = new Set(p.tag_ids || []);
+      const tagPanelHtml = tags.length
+        ? tags.map(t=>`
+            <label>
+              <input type="checkbox" value="${t.id}" ${tagIds.has(t.id)?'checked':''}>
+              ${escapeAttr(t.name || '(未入力)')}
+            </label>`).join('')
+        : '<span style="color:#8a7c7f;">先に特記事項タグを登録してください</span>';
+      tr.innerHTML = `
+        <td data-label="プログラム名"><input type="text" class="progName" value="${escapeAttr(p.name)}" placeholder="例）ジェルワンカラー"></td>
+        <td data-label="標準時間（分）"><input type="number" class="progDuration" value="${p.duration}" min="0" step="5"></td>
+        <td data-label="Bパターン時間（分・任意）"><input type="number" class="progHalf" value="${p.half_override ?? ''}" min="0" step="5" placeholder="自動:${autoHalf(p.duration)}分"></td>
+        <td data-label="Bパターン不可">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem;">
+            <input type="checkbox" class="progNoSplit" ${p.no_split ? 'checked' : ''}>
+            片手/片足ずつ不可
+          </label>
+        </td>
+        <td data-label="使用する特記事項タグ">
+          <details class="ng">
+            <summary>タグを選ぶ <span class="ngCount">(${tagIds.size})</span></summary>
+            <div class="panel ngPanel">${tagPanelHtml}</div>
+          </details>
+        </td>
+        <td><button class="btn remove small" type="button">削除</button></td>
+      `;
+      const nameInput = tr.querySelector('.progName');
+      const durInput = tr.querySelector('.progDuration');
+      const halfInput = tr.querySelector('.progHalf');
+      const noSplitInput = tr.querySelector('.progNoSplit');
+      let saveTimer = null;
+      function scheduleSave(){
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(()=>saveProgram(p.id, {
+          name: nameInput.value,
+          duration: Number(durInput.value)||0,
+          half_override: halfInput.value === '' ? null : (Number(halfInput.value)||0)
+        }), 500);
+      }
+      nameInput.addEventListener('input', scheduleSave);
+      durInput.addEventListener('input', ()=>{
+        halfInput.placeholder = `自動:${autoHalf(Number(durInput.value)||0)}分`;
+        scheduleSave();
+      });
+      halfInput.addEventListener('input', scheduleSave);
+      noSplitInput.addEventListener('change', ()=>{
+        saveProgram(p.id, { no_split: noSplitInput.checked });
+      });
+      tr.querySelectorAll('.ngPanel input[type=checkbox]').forEach(cb=>{
+        cb.addEventListener('change', e=>{
+          if(e.target.checked) tagIds.add(e.target.value);
+          else tagIds.delete(e.target.value);
+          tr.querySelector('.ngCount').textContent = `(${tagIds.size})`;
+          saveProgram(p.id, { tag_ids: Array.from(tagIds) });
+        });
+      });
+      tr.querySelector('.btn.remove').addEventListener('click', ()=>deleteProgram(p.id));
+      programTbody.appendChild(tr);
+    });
+  }
+
+  async function saveProgram(id, fields){
+    const { error } = await supabase.from('programs').update(fields).eq('id', id);
+    if(error){ console.error(error); return; }
+    const idx = programs.findIndex(p=>p.id===id);
+    if(idx>-1) programs[idx] = { ...programs[idx], ...fields };
+    populateSelfProgramSelect();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  async function deleteProgram(id){
+    const { error } = await supabase.from('programs').delete().eq('id', id);
+    if(error){ console.error(error); return; }
+    programs = programs.filter(p=>p.id!==id);
+    renderProgramTable();
+    populateSelfProgramSelect();
+    renderSelfNgPanel();
+    renderRoster();
+  }
+
+  document.getElementById('addProgramBtn').addEventListener('click', async ()=>{
+    if(!supabaseReady) return;
+    const sortOrder = programs.length;
+    const { data, error } = await supabase.from('programs').insert({ name:'', duration:30, half_override:null, sort_order: sortOrder, tag_ids: [], no_split: false }).select().single();
+    if(error){ console.error(error); return; }
+    programs.push(data);
+    renderProgramTable();
+    populateSelfProgramSelect();
+    renderSelfNgPanel();
+  });
+
+  function populateSelfProgramSelect(){
+    const current = selfProgramSelect.value;
+    selfProgramSelect.innerHTML = '<option value="">選択してください</option>' +
+      programs.map(p=>`<option value="${p.id}">${escapeAttr(p.name || '(未入力)')}（${p.duration}分）</option>`).join('');
+    if(programs.some(p=>p.id===current)) selfProgramSelect.value = current;
+  }
+
+  function renderSelfNgPanel(){
+    selfNgPanel.innerHTML = tags.length
+      ? tags.map(t=>`
+          <label>
+            <input type="checkbox" value="${t.id}" ${selfNgSelected.has(t.id)?'checked':''}>
+            ${escapeAttr(t.name || '(未入力)')}
+          </label>`).join('')
+      : '<span style="color:#8a7c7f;">特記事項タグがまだ登録されていません</span>';
+    selfNgPanel.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change', e=>{
+        if(e.target.checked) selfNgSelected.add(e.target.value);
+        else selfNgSelected.delete(e.target.value);
+        selfNgCount.textContent = `(${selfNgSelected.size})`;
+      });
+    });
+    selfNgCount.textContent = `(${selfNgSelected.size})`;
+  }
+
+  // ---------- Self entry (local only — never sent over the network) ----------
+  selfSubmitBtn.addEventListener('click', ()=>{
+    const name = selfNameInput.value.trim();
+    const programId = selfProgramSelect.value;
+    if(!name || !programId){
+      alert('名前とプログラムの両方を入力してください。');
+      return;
+    }
+    const ngTagIds = Array.from(selfNgSelected);
+    sessionStudents.push({ id: 's' + (sessionSeq++), name, program_id: programId, ng_tag_ids: ngTagIds });
+    renderRoster();
+
+    // Clear the form so the next student can enter their own info.
+    selfNameInput.value = '';
+    selfProgramSelect.value = '';
+    selfNgSelected.clear();
+    renderSelfNgPanel();
+    selfEntryStatus.innerHTML = `<span class="status-pill">${escapeHtml(name)}さんを追加しました。次の人にタブレットを渡してください</span>`;
+  });
+
+  document.getElementById('teacherAddBtn').addEventListener('click', ()=>{
+    const name = prompt('生徒の名前を入力してください');
+    if(!name) return;
+    sessionStudents.push({ id: 's' + (sessionSeq++), name: name.trim(), program_id: null, ng_tag_ids: [] });
+    renderRoster();
+  });
+
+  document.getElementById('resetSessionBtn').addEventListener('click', ()=>{
+    if(!sessionStudents.length && !resultsSection.style.display) return;
+    if(!confirm('この授業回の生徒データをすべて削除します。よろしいですか？')) return;
+    sessionStudents = [];
+    renderRoster();
+    resultsSection.style.display = 'none';
+    if(teacherOffHint) teacherOffHint.style.display = 'block';
+
+    // Clear the leftover "◯◯さんを追加しました" banner and reset the
+    // entry form, so no trace of the previous class's submissions remains.
+    selfEntryStatus.innerHTML = '';
+    selfNameInput.value = '';
+    selfProgramSelect.value = '';
+    selfNgSelected.clear();
+    renderSelfNgPanel();
+  });
+
+  function renderRoster(){
+    rosterList.innerHTML = '';
+    if(!sessionStudents.length){
+      rosterList.innerHTML = '<p class="hint" style="margin:0;">まだ入力がありません。</p>';
+      return;
+    }
+    const isTeacher = document.body.classList.contains('teacher-mode');
+    sessionStudents.forEach(s=>{
+      const p = programs.find(x=>x.id===s.program_id);
+      const row = document.createElement('div');
+      row.className = 'roster-row';
+      const ngNames = (s.ng_tag_ids||[]).map(id=>{
+        const tt = tags.find(x=>x.id===id);
+        return tt ? tt.name : '';
+      }).filter(Boolean);
+      row.innerHTML = `
+        <div>
+          <span class="who">${escapeHtml(s.name)}</span>
+          <div class="meta">${p ? escapeHtml(p.name)+'（'+p.duration+'分）' : 'プログラム未設定'}${ngNames.length ? ' ／ 特記事項(NG): '+escapeHtml(ngNames.join('、')) : ''}</div>
+        </div>
+        <div class="row-actions"></div>
+      `;
+      if(isTeacher){
+        const actions = row.querySelector('.row-actions');
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn remove small';
+        delBtn.type = 'button';
+        delBtn.textContent = '削除';
+        delBtn.addEventListener('click', ()=>{
+          if(!confirm(`${s.name}さんのデータを削除しますか？`)) return;
+          sessionStudents = sessionStudents.filter(x=>x.id!==s.id);
+          renderRoster();
+        });
+        actions.appendChild(delBtn);
+      }
+      rosterList.appendChild(row);
+    });
+  }
+
+  // ---------- Pairing / grouping logic ----------
+  const validationMsg = document.getElementById('validationMsg');
+  const resultsSection = document.getElementById('resultsSection');
+  const summaryBar = document.getElementById('summaryBar');
+  const resultsBody = document.getElementById('resultsBody');
+  const resultsGeneratedAt = document.getElementById('resultsGeneratedAt');
+
+  function hasNgConflict(ngTagSet, programTagIds){
+    return (programTagIds||[]).some(t => ngTagSet.has(t));
+  }
+  function conflictTagNames(ngTagSet, programTagIds){
+    return (programTagIds||[]).filter(t => ngTagSet.has(t))
+      .map(id => (tags.find(x=>x.id===id) || {}).name)
+      .filter(Boolean);
+  }
+
+  function pairInfo(a, b, feedbackMin, sessionMin){
+    const total = a.duration + feedbackMin + b.duration + feedbackMin;
+    const conflictAB = hasNgConflict(a.ng, b.programTagIds); // a (as model) has an NG tag that b's program uses
+    const conflictBA = hasNgConflict(b.ng, a.programTagIds);
+    const conflicts = (conflictAB?1:0) + (conflictBA?1:0);
+    const overBudget = total - sessionMin;
+    return { total, conflicts, overBudget, conflictAB, conflictBA };
+  }
+
+  function evaluateTriad(members, feedbackMin, sessionMin){
+    const [m0, m1, m2] = members;
+    const orders = [[m0, m1, m2], [m0, m2, m1]];
+    // If any member's program can't be split between two technicians
+    // (e.g. a foot treatment where one person can't do "one foot each"),
+    // Pattern B is invalid for this trio entirely — every member acts as
+    // a split-technician in two of the three B rounds, so a single
+    // no-split program rules it out for the whole group.
+    const bPatternAllowed = !members.some(m => m.noSplit);
+    let best = null;
+
+    orders.forEach(order=>{
+      let totalA = 0, conflictsA = 0;
+      const roundsA = [];
+      for(let i=0;i<3;i++){
+        const tech = order[i];
+        const model = order[(i+1)%3];
+        const conflict = hasNgConflict(model.ng, tech.programTagIds);
+        if(conflict) conflictsA++;
+        totalA += tech.duration + feedbackMin;
+        roundsA.push({ tech, model, duration: tech.duration, conflict, pattern:'A' });
+      }
+      const overA = totalA - sessionMin;
+      const candidateA = { pattern:'A', order, rounds: roundsA, total: totalA, conflicts: conflictsA, overBudget: overA };
+
+      const candidates = [candidateA];
+
+      if(bPatternAllowed){
+        let totalB = 0, conflictsB = 0;
+        const roundsB = [];
+        for(let i=0;i<3;i++){
+          const model = order[i];
+          const techA = order[(i+1)%3];
+          const techB = order[(i+2)%3];
+          const pA = programs.find(p=>p.id===techA.programId) || { duration: techA.duration, half_override: null };
+          const pB = programs.find(p=>p.id===techB.programId) || { duration: techB.duration, half_override: null };
+          const halfA = getHalfDuration(pA);
+          const halfB = getHalfDuration(pB);
+          const conflictA = hasNgConflict(model.ng, techA.programTagIds);
+          const conflictB = hasNgConflict(model.ng, techB.programTagIds);
+          if(conflictA) conflictsB++;
+          if(conflictB) conflictsB++;
+          const roundDuration = Math.max(halfA, halfB);
+          totalB += roundDuration + feedbackMin;
+          roundsB.push({ model, techA, techB, halfA, halfB, roundDuration, conflictA, conflictB, pattern:'B' });
+        }
+        const overB = totalB - sessionMin;
+        candidates.push({ pattern:'B', order, rounds: roundsB, total: totalB, conflicts: conflictsB, overBudget: overB });
+      }
+
+      candidates.forEach(cand=>{
+        if(!best) { best = cand; return; }
+        const bestScore = Math.max(best.overBudget,0)*1000 + best.conflicts*10 + best.total*0.01 + (best.pattern==='B'?0.001:0);
+        const candScore = Math.max(cand.overBudget,0)*1000 + cand.conflicts*10 + cand.total*0.01 + (cand.pattern==='B'?0.001:0);
+        if(candScore < bestScore) best = cand;
+      });
+    });
+
+    return best;
+  }
+
+  // Runs one randomized pass of greedy pairing + leftover-to-triad merge.
+  // Because the greedy pair-up is a step-by-step local choice, a single
+  // pass can lock in an early "cheap" pair that forces a bad pair later
+  // (e.g. pairing two short programs first leaves two long programs stuck
+  // together and over time). Running this many times with fresh random
+  // tie-breaking and keeping the best-scoring overall result approximates
+  // a more global optimum without a full matching solver.
+  function groupMembers(g){ return g.kind === 'pair' ? [g.a, g.b] : g.triad.order; }
+
+  function buildGroupFromMembers(members, feedbackMin, sessionMin){
+    if(members.length === 2){
+      const info = pairInfo(members[0], members[1], feedbackMin, sessionMin);
+      return { kind:'pair', a: members[0], b: members[1], info };
+    }
+    const triad = evaluateTriad(members, feedbackMin, sessionMin);
+    return { kind:'triad', triad };
+  }
+
+  function groupScore(g){
+    const info = g.kind === 'pair' ? g.info : g.triad;
+    return Math.max(info.overBudget,0)*1000 + info.conflicts*10 + info.total*0.01;
+  }
+
+  // Greedy pairing can lock in an early "cheap" pair (e.g. two short
+  // programs) that forces a much worse pair later (two long programs
+  // stuck together, running well over time). This pass tries swapping one
+  // member between every pair of groups and keeps any swap that lowers
+  // the combined score, repeating until no swap helps. It's a simple local
+  // search, not a full optimal solver, but it reliably escapes the kind of
+  // bad greedy fixation described above.
+  function localSearchImprove(groups, feedbackMin, sessionMin, maxPasses){
+    let current = groups.slice();
+    let improved = true;
+    let passes = 0;
+    while(improved && passes < maxPasses){
+      improved = false;
+      passes++;
+      for(let i=0;i<current.length;i++){
+        for(let j=i+1;j<current.length;j++){
+          const mi = groupMembers(current[i]);
+          const mj = groupMembers(current[j]);
+          const baseScore = groupScore(current[i]) + groupScore(current[j]);
+          let bestDelta = -1e-9, bestSwap = null;
+          for(let x=0;x<mi.length;x++){
+            for(let y=0;y<mj.length;y++){
+              const newMi = mi.slice(); const newMj = mj.slice();
+              const tmp = newMi[x]; newMi[x] = newMj[y]; newMj[y] = tmp;
+              const gi = buildGroupFromMembers(newMi, feedbackMin, sessionMin);
+              const gj = buildGroupFromMembers(newMj, feedbackMin, sessionMin);
+              const delta = (groupScore(gi) + groupScore(gj)) - baseScore;
+              if(delta < bestDelta){ bestDelta = delta; bestSwap = { gi, gj }; }
+            }
+          }
+          if(bestSwap){
+            current[i] = bestSwap.gi;
+            current[j] = bestSwap.gj;
+            improved = true;
+          }
+        }
+      }
+    }
+    return current;
+  }
+
+  function scoreGroups(groups){
+    return groups.reduce((sum, g)=>{
+      const info = g.kind === 'pair' ? g.info : g.triad;
+      return sum + Math.max(info.overBudget,0)*1000 + info.conflicts*10;
+    }, 0);
+  }
+
+  function buildGroupingOnce(usable, feedbackMin, sessionMin){
+    let remaining = [...usable];
+    const pairs = [];
+    while(remaining.length >= 2){
+      let bestI=-1, bestJ=-1, bestScore=Infinity, bestInfo=null;
+      for(let i=0;i<remaining.length;i++){
+        for(let j=i+1;j<remaining.length;j++){
+          const info = pairInfo(remaining[i], remaining[j], feedbackMin, sessionMin);
+          const jitter = Math.random()*0.05;
+          const score = Math.max(info.overBudget,0)*1000 + info.conflicts*10 + info.total*0.01 + jitter;
+          if(score < bestScore){ bestScore = score; bestI = i; bestJ = j; bestInfo = info; }
+        }
+      }
+      if(bestI === -1) break;
+      pairs.push({ a: remaining[bestI], b: remaining[bestJ], info: bestInfo });
+      remaining.splice(bestJ,1);
+      remaining.splice(bestI,1);
+    }
+    const leftover = remaining;
+
+    const groups = pairs.map(p => ({ kind:'pair', a: p.a, b: p.b, info: p.info }));
+
+    if(leftover.length === 1 && groups.length > 0){
+      const extra = leftover[0];
+      let bestGroupIdx = -1, bestTriad = null, bestScore = Infinity;
+      groups.forEach((g, idx)=>{
+        if(g.kind !== 'pair') return;
+        const triad = evaluateTriad([g.a, g.b, extra], feedbackMin, sessionMin);
+        const score = Math.max(triad.overBudget,0)*1000 + triad.conflicts*10 + triad.total*0.01;
+        if(score < bestScore){ bestScore = score; bestGroupIdx = idx; bestTriad = triad; }
+      });
+      if(bestGroupIdx > -1){
+        groups[bestGroupIdx] = { kind:'triad', triad: bestTriad };
+        leftover.length = 0;
+      }
+    }
+
+    const totalScore = groups.reduce((sum, g)=>{
+      const info = g.kind === 'pair' ? g.info : g.triad;
+      return sum + Math.max(info.overBudget,0)*1000 + info.conflicts*10;
+    }, 0);
+
+    return { groups, leftover, totalScore };
+  }
+
+  function buildBestGrouping(usable, feedbackMin, sessionMin, trials){
+    let best = null;
+    for(let t=0; t<trials; t++){
+      const attempt = buildGroupingOnce(usable, feedbackMin, sessionMin);
+      const improvedGroups = localSearchImprove(attempt.groups, feedbackMin, sessionMin, 50);
+      const improvedScore = scoreGroups(improvedGroups);
+      if(!best || improvedScore < best.totalScore){
+        best = { groups: improvedGroups, leftover: attempt.leftover, totalScore: improvedScore };
+      }
+    }
+    return best;
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', ()=>{
+    validationMsg.style.display = 'none';
+
+    const sessionMin = Number(document.getElementById('sessionMinutes').value) || 0;
+    const feedbackMin = Number(document.getElementById('feedbackMinutes').value) || 0;
+
+    const usable = sessionStudents
+      .filter(s => s.name && s.name.trim() && s.program_id)
+      .map(s => {
+        const p = programs.find(x=>x.id===s.program_id);
+        return { id: s.id, name: s.name.trim(), programId: s.program_id, programName: p ? p.name : '', duration: p ? p.duration : 0, programTagIds: p ? (p.tag_ids||[]) : [], noSplit: p ? !!p.no_split : false, ng: new Set(s.ng_tag_ids||[]) };
+      });
+
+    if(usable.length < 2){
+      validationMsg.textContent = '名前とプログラムの両方が入力された生徒が2名以上必要です。';
+      validationMsg.style.display = 'block';
+      resultsSection.style.display = 'none';
+      return;
+    }
+
+    // Try many randomized arrangements and keep the one with the least
+    // total time-overage (and, secondarily, the fewest NG conflicts).
+    const { groups, leftover } = buildBestGrouping(usable, feedbackMin, sessionMin, 60);
+
+    const payload = { groups, leftover, sessionMin, feedbackMin };
+    renderResultsFromPayload(payload, new Date().toISOString());
+  });
+
+  function renderResultsFromPayload(payload, generatedAtIso){
+    const { groups, leftover, sessionMin, feedbackMin } = payload;
+    resultsSection.style.display = 'block';
+    if(teacherOffHint) teacherOffHint.style.display = 'none';
+    if(generatedAtIso){
+      const d = new Date(generatedAtIso);
+      resultsGeneratedAt.textContent = `生成日時：${d.toLocaleString('ja-JP')}`;
+    }
+
+    const pairGroups = groups.filter(g=>g.kind==='pair');
+    const triadGroups = groups.filter(g=>g.kind==='triad');
+    const conflictCount = groups.filter(g => g.kind==='pair' ? g.info.conflicts>0 : g.triad.conflicts>0).length;
+    const overCount = groups.filter(g => g.kind==='pair' ? g.info.overBudget>0 : g.triad.overBudget>0).length;
+
+    summaryBar.innerHTML = `
+      <div>グループ数：<strong>${groups.length}</strong>（2人組 ${pairGroups.length}／3人組 ${triadGroups.length}）</div>
+      <div>NG回避できなかったグループ：<strong style="color:${conflictCount? '#A85A2A':'#3F6B63'}">${conflictCount}</strong></div>
+      <div>時間超過グループ：<strong style="color:${overCount? '#B03A2E':'#3F6B63'}">${overCount}</strong></div>
+    `;
+
+    resultsBody.innerHTML = '';
+    groups.forEach((g, idx)=>{
+      if(g.kind === 'pair'){
+        resultsBody.appendChild(buildPairCard(g.a, g.b, g.info, idx, sessionMin, feedbackMin));
+      } else {
+        resultsBody.appendChild(buildTriadCard(g.triad, idx, sessionMin, feedbackMin));
+      }
+    });
+
+    if(leftover && leftover.length){
+      const div = document.createElement('div');
+      div.className = 'leftover-card';
+      div.textContent = `ペア相手が見つかりませんでした：${leftover.map(s=>s.name).join('、')}さんは講師が個別に対応してください。`;
+      resultsBody.appendChild(div);
+    }
+  }
+
+  function buildPairCard(a, b, info, idx, sessionMin, feedbackMin){
+    const card = document.createElement('div');
+    card.className = 'pair-card';
+    const overflowMin = Math.max(info.overBudget, 0);
+    const segs = [
+      { cls:'tech', min: a.duration }, { cls:'fb', min: feedbackMin },
+      { cls:'tech', min: b.duration }, { cls:'fb', min: feedbackMin },
+    ];
+    const totalForBar = Math.max(info.total, sessionMin);
+    const segHtml = segs.map(s => `<div class="seg ${s.cls}" style="width:${(s.min/totalForBar*100).toFixed(2)}%"></div>`).join('');
+    const boundaryPct = (sessionMin/totalForBar*100).toFixed(2);
+
+    let warnHtml = '';
+    if(info.conflicts > 0){
+      const who = [];
+      if(info.conflictAB) who.push(`${a.name}さんの特記事項「${conflictTagNames(a.ng, b.programTagIds).join('・')}」と${b.name}さんの「${b.programName}」が重なっています`);
+      if(info.conflictBA) who.push(`${b.name}さんの特記事項「${conflictTagNames(b.ng, a.programTagIds).join('・')}」と${a.name}さんの「${a.programName}」が重なっています`);
+      warnHtml += `<div class="warn ng-warn">⚠️ NG組み合わせを回避できませんでした：${who.join('／')}</div>`;
+    }
+    if(info.overBudget > 0){
+      warnHtml += `<div class="warn time-warn">⚠️ ${sessionMin}分の持ち時間を ${info.overBudget}分 超過しています</div>`;
+    }
+    if(info.conflicts === 0 && info.overBudget <= 0){
+      warnHtml += `<div class="warn ok">問題なく収まっています</div>`;
+    }
+
+    card.innerHTML = `
+      <div class="pair-title">グループ ${idx+1}（2人組）：${escapeAttr(a.name)} ／ ${escapeAttr(b.name)}</div>
+      <div class="pair-meta">合計 ${info.total}分（持ち時間 ${sessionMin}分）</div>
+      <div class="cycle-line"><span class="role">1巡目</span>${escapeAttr(a.name)}が施術（${escapeAttr(a.programName)}・${a.duration}分）／${escapeAttr(b.name)}がモデル → 講師チェック・FB ${feedbackMin}分</div>
+      <div class="cycle-line"><span class="role">2巡目</span>${escapeAttr(b.name)}が施術（${escapeAttr(b.programName)}・${b.duration}分）／${escapeAttr(a.name)}がモデル → 講師チェック・FB ${feedbackMin}分</div>
+      ${warnHtml}
+      <div class="timebar-wrap">
+        <div class="timebar">
+          ${segHtml}
+          ${overflowMin>0 ? `<div class="seg overflow" style="width:${(overflowMin/totalForBar*100).toFixed(2)}%"></div>` : ''}
+        </div>
+        <div class="timebar-boundary-row" style="position:relative;">
+          <div class="timebar-boundary" style="left:${boundaryPct}%;"></div>
+        </div>
+        <div class="timebar-legend">
+          <span><span class="swatch" style="background:var(--wine)"></span>施術</span>
+          <span><span class="swatch" style="background:var(--teal)"></span>チェック／FB</span>
+          <span><span class="swatch" style="background:var(--ink)"></span>持ち時間の境界（${sessionMin}分）</span>
+          ${overflowMin>0 ? `<span><span class="swatch" style="background:repeating-linear-gradient(45deg,#B03A2E,#B03A2E 3px,#fff0 3px,#fff0 6px)"></span>超過分</span>` : ''}
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  function buildTriadCard(triad, idx, sessionMin, feedbackMin){
+    const card = document.createElement('div');
+    card.className = 'pair-card';
+    const names = triad.order.map(m=>m.name).join('／');
+    const overflowMin = Math.max(triad.overBudget, 0);
+    const totalForBar = Math.max(triad.total, sessionMin);
+
+    let cycleHtml = '';
+    const segs = [];
+    let warnParts = [];
+
+    if(triad.pattern === 'A'){
+      triad.rounds.forEach((r, i)=>{
+        cycleHtml += `<div class="cycle-line"><span class="role">${i+1}巡目</span>${escapeAttr(r.tech.name)}が施術（${escapeAttr(r.tech.programName)}・${r.duration}分）／${escapeAttr(r.model.name)}がモデル → 講師チェック・FB ${feedbackMin}分</div>`;
+        segs.push({ cls:'tech', min: r.duration }, { cls:'fb', min: feedbackMin });
+        if(r.conflict) warnParts.push(`${r.model.name}さんの特記事項「${conflictTagNames(r.model.ng, r.tech.programTagIds).join('・')}」と${r.tech.name}さんの「${r.tech.programName}」が重なっています`);
+      });
+    } else {
+      triad.rounds.forEach((r, i)=>{
+        cycleHtml += `<div class="cycle-line"><span class="role">${i+1}巡目</span>${escapeAttr(r.model.name)}がモデル／${escapeAttr(r.techA.name)}（${escapeAttr(r.techA.programName)}・片手${r.halfA}分）と${escapeAttr(r.techB.name)}（${escapeAttr(r.techB.programName)}・片手${r.halfB}分）が同時施術 → 講師チェック・FB ${feedbackMin}分</div>`;
+        segs.push({ cls:'tech', min: r.roundDuration }, { cls:'fb', min: feedbackMin });
+        if(r.conflictA) warnParts.push(`${r.model.name}さんの特記事項「${conflictTagNames(r.model.ng, r.techA.programTagIds).join('・')}」と${r.techA.name}さんの「${r.techA.programName}」が重なっています`);
+        if(r.conflictB) warnParts.push(`${r.model.name}さんの特記事項「${conflictTagNames(r.model.ng, r.techB.programTagIds).join('・')}」と${r.techB.name}さんの「${r.techB.programName}」が重なっています`);
+      });
+    }
+
+    const segHtml = segs.map(s => `<div class="seg ${s.cls}" style="width:${(s.min/totalForBar*100).toFixed(2)}%"></div>`).join('');
+    const boundaryPct = (sessionMin/totalForBar*100).toFixed(2);
+
+    let warnHtml = '';
+    if(warnParts.length){
+      warnHtml += `<div class="warn ng-warn">⚠️ NG組み合わせを回避できませんでした：${warnParts.join('／')}</div>`;
+    }
+    if(triad.overBudget > 0){
+      warnHtml += `<div class="warn time-warn">⚠️ ${sessionMin}分の持ち時間を ${triad.overBudget}分 超過しています</div>`;
+    }
+    if(!warnParts.length && triad.overBudget <= 0){
+      warnHtml += `<div class="warn ok">問題なく収まっています</div>`;
+    }
+
+    const patternLabel = triad.pattern === 'A'
+      ? 'Aパターン（順番に1対1を3巡・全員フル施術）'
+      : 'Bパターン（2人同時・片手ずつで時短）';
+
+    card.innerHTML = `
+      <div class="pair-title">グループ ${idx+1}（3人組・${patternLabel}）：${escapeAttr(names)}</div>
+      <div class="pair-meta">合計 ${triad.total}分（持ち時間 ${sessionMin}分）</div>
+      ${cycleHtml}
+      ${warnHtml}
+      <div class="timebar-wrap">
+        <div class="timebar">
+          ${segHtml}
+          ${overflowMin>0 ? `<div class="seg overflow" style="width:${(overflowMin/totalForBar*100).toFixed(2)}%"></div>` : ''}
+        </div>
+        <div class="timebar-boundary-row" style="position:relative;">
+          <div class="timebar-boundary" style="left:${boundaryPct}%;"></div>
+        </div>
+        <div class="timebar-legend">
+          <span><span class="swatch" style="background:var(--wine)"></span>施術</span>
+          <span><span class="swatch" style="background:var(--teal)"></span>チェック／FB</span>
+          <span><span class="swatch" style="background:var(--ink)"></span>持ち時間の境界（${sessionMin}分）</span>
+          ${overflowMin>0 ? `<span><span class="swatch" style="background:repeating-linear-gradient(45deg,#B03A2E,#B03A2E 3px,#fff0 3px,#fff0 6px)"></span>超過分</span>` : ''}
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  // ---------- init ----------
+  // Note: we deliberately do NOT subscribe to realtime changes on
+  // programs/tags. Doing so caused Supabase to echo our own edits back
+  // to this same tab, which rebuilt the input fields mid-keystroke and
+  // broke Japanese IME conversion. Teacher-mode edits save directly;
+  // use the manual refresh buttons if another device changed the data.
+  (async function init(){
+    if(!supabaseReady) return;
+    await loadTags();
+    await loadPrograms();
+    renderRoster();
+  })();
+</script>
+
+</body>
+</html>
