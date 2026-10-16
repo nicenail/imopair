@@ -2,19 +2,41 @@ name: Keep Supabase Awake
 
 on:
   schedule:
-    # Runs once a day at 03:00 UTC (12:00 JST). Public repos have
-    # unlimited free GitHub Actions minutes, so daily is safe and cheap.
+    # Runs once a day. Public repos have unlimited free GitHub Actions minutes.
     - cron: '0 3 * * *'
   workflow_dispatch: {}   # lets you also trigger it manually from the Actions tab
+
+# contents: write is only needed for the monthly "keep the repo active" commit below.
+permissions:
+  contents: write
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://ueibndaqzqnkqlwwsoct.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlaWJuZGFxenFua3Fsd3dzb2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzNTg5MTIsImV4cCI6MjEwMDkzNDkxMn0.9m20jeKf6GrRfFqQrGdoocF_iV3rH4r6tB9PZPrt1HE
     steps:
       - name: Ping Supabase (programs table)
         run: |
           curl -sS -o /dev/null -w "HTTP status: %{http_code}\n" \
-            "https://ueibndaqzqnkqlwwsoct.supabase.co/rest/v1/programs?select=id&limit=1" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlaWJuZGFxenFua3Fsd3dzb2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzNTg5MTIsImV4cCI6MjEwMDkzNDkxMn0.9m20jeKf6GrRfFqQrGdoocF_iV3rH4r6tB9PZPrt1HE" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlaWJuZGFxenFua3Fsd3dzb2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzNTg5MTIsImV4cCI6MjEwMDkzNDkxMn0.9m20jeKf6GrRfFqQrGdoocF_iV3rH4r6tB9PZPrt1HE"
+            "$SUPABASE_URL/rest/v1/programs?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
 
+      # GitHub switches off scheduled workflows in a public repo after 60 days
+      # without repository activity. An empty commit on the 1st of each month
+      # keeps this workflow from being disabled again.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Keep repository active (monthly empty commit)
+        run: |
+          if [ "$(date -u +%d)" = "01" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keep scheduled workflow active"
+            git push
+          else
+            echo "Not the 1st of the month, skipping."
+          fi
