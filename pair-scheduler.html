@@ -307,6 +307,27 @@
   .banner.error{ background:#F6DEDA; color: var(--danger); border:1px solid #E9BEB6; }
   .banner.info{ background:#E1EBE8; color: var(--teal); border:1px solid #C9DBD6; }
 
+  .keybox{
+    width: 100%;
+    font-family: monospace;
+    font-size: 0.78rem;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    resize: vertical;
+    min-height: 70px;
+  }
+  .key-warning{
+    background: #F6DEDA;
+    color: var(--danger);
+    border: 1px solid #E9BEB6;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin: 10px 0;
+  }
+
   /* results */
   #resultsSection{ display: none; }
   .summary-bar{
@@ -492,14 +513,25 @@
   </section>
   </div>
 
+  <div class="teacher-only">
   <section class="card">
-    <h2><span class="num">4</span>生徒情報の入力（この端末を順番に回してください）</h2>
-    <p class="hint">1人ずつ、この画面で名前・実施するプログラム・特記事項（できれば避けたいタグ）を入力して「送信する」を押してください。送信すると一覧に追加され、フォームは次の人のために空になります。この情報はネットには送信されず、この端末のブラウザの中だけで保持されます。</p>
+    <h2><span class="num">4</span>暗号鍵の設定<span class="mode-badge" id="keySyncBadge" style="background:var(--surface-2); color:var(--ink-soft);">確認中</span></h2>
+    <p class="hint">生徒はこの後の「公開鍵」で名前・プログラム・特記事項を暗号化して送信します。中身を読める「秘密鍵」は、この端末にだけ保存され、Supabaseには一切送信されません。最初に1回だけ鍵を作れば、以降は使い回せます。</p>
+    <div id="keySetupArea"></div>
+  </section>
+  </div>
+
+  <section class="card">
+    <h2><span class="num">5</span>生徒情報の入力（各自のスマホから入力してください）</h2>
+    <p class="hint">名前・実施予定日・実施するプログラム・特記事項（できれば避けたいタグ）を入力して「送信する」を押してください。内容はこの端末の中で暗号化してから送信されるため、他の生徒や、秘密鍵を持たない人には読めません。</p>
     <div class="self-entry" id="selfEntryArea">
       <div id="selfEntryStatus"></div>
       <div class="row-flex" style="align-items:flex-end;">
         <label class="field" style="min-width:160px;">名前
           <input type="text" id="selfName" placeholder="生徒名">
+        </label>
+        <label class="field">実施予定日
+          <input type="date" id="selfDate">
         </label>
         <label class="field" style="min-width:220px;">実施プログラム
           <select id="selfProgram"></select>
@@ -514,12 +546,18 @@
       </div>
     </div>
 
-    <p class="hint" style="margin-bottom:6px;">現在の入力状況（削除は講師モードのみ操作できます）</p>
+    <div class="teacher-only" style="margin-bottom:14px;">
+      <label class="field" style="max-width:220px;">生成・確認する日付
+        <input type="date" id="teacherViewDate">
+      </label>
+    </div>
+
+    <p class="hint" style="margin-bottom:6px;">現在の入力状況（内容は暗号化されています。削除は講師モードまたは本人の端末のみ操作できます）</p>
     <div class="roster-list" id="rosterList"></div>
 
     <div class="teacher-only actions-row" style="justify-content: space-between; align-items:center;">
-      <button class="btn ghost small" id="teacherAddBtn" type="button">＋ 講師が代理で追加</button>
-      <button class="btn danger small" id="resetSessionBtn" type="button">生徒データをリセット（新しい授業を開始）</button>
+      <button class="btn ghost small" id="refreshSubmissionsBtn" type="button">🔄 再読み込み</button>
+      <button class="btn danger small" id="resetSessionBtn" type="button">この日付のデータをリセット</button>
     </div>
   </section>
 
@@ -530,7 +568,7 @@
   <p class="hint teacher-off-hint" id="teacherOffHint">結果は講師が生成すると、ここに表示されます。</p>
 
   <section class="card" id="resultsSection">
-    <h2><span class="num">5</span>生成結果</h2>
+    <h2><span class="num">6</span>生成結果</h2>
     <p class="hint" id="resultsGeneratedAt"></p>
     <div class="summary-bar" id="summaryBar"></div>
     <div id="resultsBody"></div>
@@ -594,13 +632,25 @@
   // ---------- state ----------
   let programs = [];        // [{id, name, duration, half_override, sort_order, tag_ids}]  -- persisted in Supabase
   let tags = [];             // [{id, name, sort_order}]  -- persisted in Supabase (special-notes tags, e.g. アセトンNG対象)
-  let sessionStudents = [];  // [{id, name, program_id, ng_tag_ids}]  -- local only, never sent to the network
-  let sessionSeq = 1;
+  let submissions = [];      // encrypted rows for the currently selected date, as loaded from Supabase
+  let decryptedSubmissions = []; // { id, device_token, name, program_id, ng_tag_ids } — only populated in teacher mode once the private key is loaded
+  let publicKey = null;      // imported CryptoKey, used by every device to encrypt
+  let privateKey = null;     // imported CryptoKey, only ever held in this device's memory/localStorage
+
+  const DEVICE_KEY = 'nn_pairtool_device_token_v2';
+  let deviceToken = localStorage.getItem(DEVICE_KEY);
+  if(!deviceToken){
+    deviceToken = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+    localStorage.setItem(DEVICE_KEY, deviceToken);
+  }
+  const PRIVATE_KEY_STORAGE = 'nn_pairtool_private_key_pkcs8_b64';
 
   const programTbody = document.getElementById('programTbody');
   const programSyncBadge = document.getElementById('programSyncBadge');
   const tagTbody = document.getElementById('tagTbody');
   const tagSyncBadge = document.getElementById('tagSyncBadge');
+  const keySyncBadge = document.getElementById('keySyncBadge');
+  const keySetupArea = document.getElementById('keySetupArea');
   const rosterList = document.getElementById('rosterList');
   const selfProgramSelect = document.getElementById('selfProgram');
   const selfNgPanel = document.getElementById('selfNgPanel');
@@ -609,11 +659,65 @@
   const selfEntryStatus = document.getElementById('selfEntryStatus');
   const selfSubmitBtn = document.getElementById('selfSubmitBtn');
   const selfNameInput = document.getElementById('selfName');
+  const selfDateInput = document.getElementById('selfDate');
+  const teacherViewDateInput = document.getElementById('teacherViewDate');
+
+  function todayStr(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  selfDateInput.value = todayStr();
+  teacherViewDateInput.value = todayStr();
 
   function escapeAttr(str){
     return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   }
   function escapeHtml(str){ return escapeAttr(str); }
+
+  // ---------- Encryption helpers ----------
+  // Students encrypt with the public key (safe to share with everyone).
+  // Only a device that has the teacher's private key loaded can read the
+  // plaintext back. See the "暗号鍵の設定" card for key generation/entry.
+  function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+  function b64ToBuf(b64){
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+
+  async function generateKeyPair(){
+    const keyPair = await crypto.subtle.generateKey(
+      { name:'RSA-OAEP', modulusLength:2048, publicExponent:new Uint8Array([1,0,1]), hash:'SHA-256' },
+      true,
+      ['encrypt','decrypt']
+    );
+    const pub = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+    const priv = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+    return { publicKeyB64: bufToB64(pub), privateKeyB64: bufToB64(priv) };
+  }
+  async function importPublicKey(b64){
+    return crypto.subtle.importKey('spki', b64ToBuf(b64), { name:'RSA-OAEP', hash:'SHA-256' }, false, ['encrypt']);
+  }
+  async function importPrivateKey(b64){
+    return crypto.subtle.importKey('pkcs8', b64ToBuf(b64), { name:'RSA-OAEP', hash:'SHA-256' }, false, ['decrypt']);
+  }
+  async function encryptPayload(pubKey, obj){
+    const plaintext = new TextEncoder().encode(JSON.stringify(obj));
+    const aesKey = await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt','decrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, aesKey, plaintext);
+    const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+    const wrappedKey = await crypto.subtle.encrypt({ name:'RSA-OAEP' }, pubKey, rawAesKey);
+    return { ciphertext: bufToB64(ciphertext), iv: bufToB64(iv), wrappedKey: bufToB64(wrappedKey) };
+  }
+  async function decryptPayload(privKey, record){
+    const rawAesKey = await crypto.subtle.decrypt({ name:'RSA-OAEP' }, privKey, b64ToBuf(record.wrapped_key));
+    const aesKey = await crypto.subtle.importKey('raw', rawAesKey, { name:'AES-GCM' }, false, ['decrypt']);
+    const plaintext = await crypto.subtle.decrypt({ name:'AES-GCM', iv: b64ToBuf(record.iv) }, aesKey, b64ToBuf(record.ciphertext));
+    return JSON.parse(new TextDecoder().decode(plaintext));
+  }
 
   function autoHalf(duration){ return Math.round(duration/2); }
   function getHalfDuration(p){
@@ -676,9 +780,10 @@
     if(error){ console.error(error); return; }
     tags = tags.filter(t=>t.id!==id);
     // Clean up references in programs and the current self-entry selection.
+    // (Past encrypted submissions may still reference this tag id — that's
+    // harmless, renderRoster() already ignores tag ids it can't resolve.)
     programs.forEach(p=>{ p.tag_ids = (p.tag_ids||[]).filter(id2=>id2!==id); });
     selfNgSelected.delete(id);
-    sessionStudents.forEach(s=>{ s.ng_tag_ids = (s.ng_tag_ids||[]).filter(id2=>id2!==id); });
     renderTagTable();
     renderProgramTable();
     renderSelfNgPanel();
@@ -822,6 +927,127 @@
     if(programs.some(p=>p.id===current)) selfProgramSelect.value = current;
   }
 
+  // ---------- Encryption key setup (app_settings + this device's private key) ----------
+  async function loadAppSettings(){
+    const { data, error } = await supabase.from('app_settings').select('*').eq('key','public_key_spki_b64').maybeSingle();
+    if(error){ console.error(error); keySyncBadge.textContent = '読み込みエラー'; return; }
+    if(data && data.value){
+      try{
+        publicKey = await importPublicKey(data.value);
+        keySyncBadge.textContent = '公開鍵あり';
+        keySyncBadge.style.background = 'var(--teal)';
+        keySyncBadge.style.color = '#fff';
+      }catch(e){
+        console.error(e);
+        keySyncBadge.textContent = '鍵の読み込みエラー';
+      }
+    } else {
+      publicKey = null;
+      keySyncBadge.textContent = '未作成';
+    }
+    const storedPrivate = localStorage.getItem(PRIVATE_KEY_STORAGE);
+    if(storedPrivate){
+      try{ privateKey = await importPrivateKey(storedPrivate); }
+      catch(e){ console.error(e); privateKey = null; }
+    }
+    renderKeySetupArea();
+  }
+
+  function renderKeySetupArea(){
+    const hasPublic = !!publicKey;
+    const hasPrivateOnThisDevice = !!privateKey;
+    let html = '';
+
+    if(!hasPublic){
+      html += `
+        <div class="banner info">まだ鍵が作られていません。最初に1回だけ、ここで鍵ペアを作成してください。</div>
+        <button class="btn" id="genKeyBtn" type="button">🔑 新しい鍵ペアを生成する</button>
+      `;
+    } else if(!hasPrivateOnThisDevice){
+      html += `
+        <div class="banner info">公開鍵は準備済みです。この端末で内容を復号する（生徒の申告を読む）には、秘密鍵をここに貼り付けてください。</div>
+        <label class="field">秘密鍵を貼り付け
+          <textarea class="keybox" id="privateKeyInput" placeholder="ここに秘密鍵を貼り付けてください"></textarea>
+        </label>
+        <div class="actions-row">
+          <button class="btn" id="savePrivateKeyBtn" type="button">この端末に登録する</button>
+        </div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; color:var(--wine); font-weight:700; font-size:0.85rem;">鍵を紛失した場合／新しく作り直したい場合</summary>
+          <div class="panel" style="margin-top:8px; max-width:520px;">
+            <p class="hint" style="margin:0 0 8px;">新しい鍵ペアを作り直すと、これまでに送信された申告は誰にも読めなくなります（新しい鍵で暗号化されたものだけが今後読めます）。</p>
+            <button class="btn danger small" id="regenKeyBtn" type="button">新しい鍵ペアを作り直す</button>
+          </div>
+        </details>
+      `;
+    } else {
+      html += `<div class="banner info">✅ この端末には秘密鍵が登録済みです。生徒の申告を復号して表示できます。</div>`;
+      html += `<details><summary style="cursor:pointer; color:var(--wine); font-weight:700; font-size:0.85rem;">別の端末用に秘密鍵を確認する／作り直す</summary>
+        <div class="panel" style="margin-top:8px; max-width:520px;">
+          <p class="hint" style="margin:0 0 8px;">他の講師端末でも復号したい場合は、その端末の「暗号鍵の設定」で同じ秘密鍵を貼り付けてください。秘密鍵はこの画面には再表示されないため、生成時に控えたものを使ってください。</p>
+          <button class="btn danger small" id="regenKeyBtn" type="button">新しい鍵ペアを作り直す</button>
+        </div>
+      </details>`;
+    }
+
+    keySetupArea.innerHTML = html;
+
+    const genBtn = document.getElementById('genKeyBtn');
+    if(genBtn) genBtn.addEventListener('click', doGenerateKeyPair);
+    const regenBtn = document.getElementById('regenKeyBtn');
+    if(regenBtn) regenBtn.addEventListener('click', ()=>{
+      if(!confirm('本当に新しい鍵ペアを作り直しますか？これまでの申告データは読めなくなります。')) return;
+      doGenerateKeyPair();
+    });
+    const saveBtn = document.getElementById('savePrivateKeyBtn');
+    if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+      const val = document.getElementById('privateKeyInput').value.trim();
+      if(!val) return;
+      try{
+        const imported = await importPrivateKey(val);
+        privateKey = imported;
+        localStorage.setItem(PRIVATE_KEY_STORAGE, val);
+        renderKeySetupArea();
+        await loadSubmissions();
+      }catch(e){
+        alert('この秘密鍵は読み込めませんでした。コピーし忘れや余分な空白がないか確認してください。');
+      }
+    });
+  }
+
+  async function doGenerateKeyPair(){
+    const { publicKeyB64, privateKeyB64 } = await generateKeyPair();
+    const { error } = await supabase.from('app_settings').upsert({ key:'public_key_spki_b64', value: publicKeyB64, updated_at: new Date().toISOString() });
+    if(error){ console.error(error); alert('公開鍵の保存に失敗しました。'); return; }
+    publicKey = await importPublicKey(publicKeyB64);
+    privateKey = await importPrivateKey(privateKeyB64);
+    localStorage.setItem(PRIVATE_KEY_STORAGE, privateKeyB64);
+    keySyncBadge.textContent = '公開鍵あり';
+    keySyncBadge.style.background = 'var(--teal)';
+    keySyncBadge.style.color = '#fff';
+
+    keySetupArea.innerHTML = `
+      <div class="key-warning">
+        ⚠️ この秘密鍵は今この画面でしか表示されません。必ずコピーして、パスワードマネージャーなど安全な場所に保存してください。この端末には自動的に登録済みです。
+      </div>
+      <label class="field">秘密鍵（コピーして保管してください）
+        <textarea class="keybox" id="newPrivateKeyDisplay" readonly>${privateKeyB64}</textarea>
+      </label>
+      <div class="actions-row">
+        <button class="btn" id="copyPrivateKeyBtn" type="button">コピーする</button>
+        <button class="btn ghost" id="doneKeySetupBtn" type="button">保存したので閉じる</button>
+      </div>
+    `;
+    document.getElementById('copyPrivateKeyBtn').addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(privateKeyB64); alert('コピーしました。'); }
+      catch(e){ alert('コピーに失敗しました。手動で選択してコピーしてください。'); }
+    });
+    document.getElementById('doneKeySetupBtn').addEventListener('click', ()=>{
+      renderKeySetupArea();
+      loadSubmissions();
+    });
+  }
+
   function renderSelfNgPanel(){
     selfNgPanel.innerHTML = tags.length
       ? tags.map(t=>`
@@ -840,42 +1066,59 @@
     selfNgCount.textContent = `(${selfNgSelected.size})`;
   }
 
-  // ---------- Self entry (local only — never sent over the network) ----------
-  selfSubmitBtn.addEventListener('click', ()=>{
+  // ---------- Self entry (encrypted before it ever leaves this device) ----------
+  selfSubmitBtn.addEventListener('click', async ()=>{
+    if(!publicKey){
+      alert('まだ暗号鍵の準備ができていません。講師が「暗号鍵の設定」で鍵を作成するまでお待ちください。');
+      return;
+    }
     const name = selfNameInput.value.trim();
     const programId = selfProgramSelect.value;
+    const classDate = selfDateInput.value || todayStr();
     if(!name || !programId){
       alert('名前とプログラムの両方を入力してください。');
       return;
     }
     const ngTagIds = Array.from(selfNgSelected);
-    sessionStudents.push({ id: 's' + (sessionSeq++), name, program_id: programId, ng_tag_ids: ngTagIds });
-    renderRoster();
+    const record = await encryptPayload(publicKey, { name, program_id: programId, ng_tag_ids: ngTagIds });
+    const { error } = await supabase.from('submissions').insert({
+      class_date: classDate,
+      device_token: deviceToken,
+      ciphertext: record.ciphertext,
+      iv: record.iv,
+      wrapped_key: record.wrappedKey,
+    });
+    if(error){
+      console.error(error);
+      alert('送信に失敗しました。ネットワーク状態を確認してもう一度お試しください。');
+      return;
+    }
+
+    if(classDate === teacherViewDateInput.value) await loadSubmissions();
 
     // Clear the form so the next student can enter their own info.
     selfNameInput.value = '';
     selfProgramSelect.value = '';
     selfNgSelected.clear();
     renderSelfNgPanel();
-    selfEntryStatus.innerHTML = `<span class="status-pill">${escapeHtml(name)}さんを追加しました。次の人にタブレットを渡してください</span>`;
+    selfEntryStatus.innerHTML = `<span class="status-pill">${escapeHtml(name)}さんを送信しました（${escapeHtml(classDate)}）。次の人に端末を渡してください</span>`;
   });
 
-  document.getElementById('teacherAddBtn').addEventListener('click', ()=>{
-    const name = prompt('生徒の名前を入力してください');
-    if(!name) return;
-    sessionStudents.push({ id: 's' + (sessionSeq++), name: name.trim(), program_id: null, ng_tag_ids: [] });
-    renderRoster();
-  });
+  document.getElementById('refreshSubmissionsBtn').addEventListener('click', loadSubmissions);
 
-  document.getElementById('resetSessionBtn').addEventListener('click', ()=>{
-    if(!sessionStudents.length && !resultsSection.style.display) return;
-    if(!confirm('この授業回の生徒データをすべて削除します。よろしいですか？')) return;
-    sessionStudents = [];
-    renderRoster();
+  teacherViewDateInput.addEventListener('change', loadSubmissions);
+
+  document.getElementById('resetSessionBtn').addEventListener('click', async ()=>{
+    const targetDate = teacherViewDateInput.value || todayStr();
+    if(!confirm(`${targetDate} の生徒データをすべて削除します。よろしいですか？`)) return;
+    const { error } = await supabase.from('submissions').delete().eq('class_date', targetDate);
+    if(error){ console.error(error); alert('削除に失敗しました。'); return; }
+    await loadSubmissions();
+    clearLastResult();
     resultsSection.style.display = 'none';
     if(teacherOffHint) teacherOffHint.style.display = 'block';
 
-    // Clear the leftover "◯◯さんを追加しました" banner and reset the
+    // Clear the leftover "◯◯さんを送信しました" banner and reset the
     // entry form, so no trace of the previous class's submissions remains.
     selfEntryStatus.innerHTML = '';
     selfNameInput.value = '';
@@ -884,42 +1127,74 @@
     renderSelfNgPanel();
   });
 
+  async function loadSubmissions(){
+    const targetDate = teacherViewDateInput.value || todayStr();
+    const { data, error } = await supabase.from('submissions').select('*').eq('class_date', targetDate).order('created_at', { ascending:true });
+    if(error){ console.error(error); return; }
+    submissions = data || [];
+    decryptedSubmissions = [];
+    if(privateKey){
+      for(const row of submissions){
+        try{
+          const plain = await decryptPayload(privateKey, row);
+          decryptedSubmissions.push({ id: row.id, device_token: row.device_token, name: plain.name, program_id: plain.program_id, ng_tag_ids: plain.ng_tag_ids||[] });
+        }catch(e){
+          decryptedSubmissions.push({ id: row.id, device_token: row.device_token, name: null, program_id: null, ng_tag_ids: [], decryptFailed: true });
+        }
+      }
+    }
+    renderRoster();
+  }
+
   function renderRoster(){
     rosterList.innerHTML = '';
-    if(!sessionStudents.length){
+    if(!submissions.length){
       rosterList.innerHTML = '<p class="hint" style="margin:0;">まだ入力がありません。</p>';
       return;
     }
     const isTeacher = document.body.classList.contains('teacher-mode');
-    sessionStudents.forEach(s=>{
-      const p = programs.find(x=>x.id===s.program_id);
-      const row = document.createElement('div');
-      row.className = 'roster-row';
-      const ngNames = (s.ng_tag_ids||[]).map(id=>{
-        const tt = tags.find(x=>x.id===id);
-        return tt ? tt.name : '';
-      }).filter(Boolean);
-      row.innerHTML = `
-        <div>
-          <span class="who">${escapeHtml(s.name)}</span>
+    const canRead = isTeacher && !!privateKey;
+
+    submissions.forEach(row=>{
+      const decrypted = decryptedSubmissions.find(d=>d.id===row.id);
+      const isMine = row.device_token === deviceToken;
+      const rosterRow = document.createElement('div');
+      rosterRow.className = 'roster-row';
+
+      let bodyHtml;
+      if(canRead && decrypted && !decrypted.decryptFailed){
+        const p = programs.find(x=>x.id===decrypted.program_id);
+        const ngNames = (decrypted.ng_tag_ids||[]).map(id=>{
+          const tt = tags.find(x=>x.id===id);
+          return tt ? tt.name : '';
+        }).filter(Boolean);
+        bodyHtml = `
+          <span class="who">${escapeHtml(decrypted.name)}</span>${isMine ? '<span class="mine-badge">自分</span>' : ''}
           <div class="meta">${p ? escapeHtml(p.name)+'（'+p.duration+'分）' : 'プログラム未設定'}${ngNames.length ? ' ／ 特記事項(NG): '+escapeHtml(ngNames.join('、')) : ''}</div>
-        </div>
-        <div class="row-actions"></div>
-      `;
-      if(isTeacher){
-        const actions = row.querySelector('.row-actions');
+        `;
+      } else if(canRead && decrypted && decrypted.decryptFailed){
+        bodyHtml = `<span class="who">🔒 復号できませんでした</span><div class="meta">別の鍵で暗号化された可能性があります</div>`;
+      } else {
+        bodyHtml = `<span class="who">🔒 送信済み${isMine ? '（自分）' : ''}</span><div class="meta">内容は暗号化されています</div>`;
+      }
+
+      rosterRow.innerHTML = `<div>${bodyHtml}</div><div class="row-actions"></div>`;
+
+      if(isMine || isTeacher){
+        const actions = rosterRow.querySelector('.row-actions');
         const delBtn = document.createElement('button');
         delBtn.className = 'btn remove small';
         delBtn.type = 'button';
         delBtn.textContent = '削除';
-        delBtn.addEventListener('click', ()=>{
-          if(!confirm(`${s.name}さんのデータを削除しますか？`)) return;
-          sessionStudents = sessionStudents.filter(x=>x.id!==s.id);
-          renderRoster();
+        delBtn.addEventListener('click', async ()=>{
+          if(!confirm('この申告を削除しますか？')) return;
+          const { error } = await supabase.from('submissions').delete().eq('id', row.id);
+          if(error){ console.error(error); return; }
+          await loadSubmissions();
         });
         actions.appendChild(delBtn);
       }
-      rosterList.appendChild(row);
+      rosterList.appendChild(rosterRow);
     });
   }
 
@@ -1138,14 +1413,59 @@
     return best;
   }
 
-  document.getElementById('generateBtn').addEventListener('click', ()=>{
+  // ---------- Remember the last generated pairs on this device ----------
+  // The result used to live only on screen, so it vanished whenever the page
+  // reloaded (switching apps on iPad, pull-to-refresh, tab being discarded).
+  // It is now kept in this browser only (never sent to Supabase) until the
+  // teacher presses リセット, or until the day after the class date.
+  const LAST_RESULT_KEY = 'nn_pairtool_last_result_v1';
+
+  function saveLastResult(date, generatedAtIso, payload){
+    try{
+      const json = JSON.stringify({ date, generatedAtIso, payload },
+        (k, v) => v instanceof Set ? { __set: Array.from(v) } : v);
+      localStorage.setItem(LAST_RESULT_KEY, json);
+    }catch(e){ console.error(e); }
+  }
+
+  function loadLastResult(){
+    try{
+      const raw = localStorage.getItem(LAST_RESULT_KEY);
+      if(!raw) return null;
+      const data = JSON.parse(raw,
+        (k, v) => (v && typeof v === 'object' && Array.isArray(v.__set)) ? new Set(v.__set) : v);
+      const classDay = new Date(data.date + 'T00:00:00');
+      const today = new Date(todayStr() + 'T00:00:00');
+      if((today - classDay) / 86400000 > 1){
+        localStorage.removeItem(LAST_RESULT_KEY);
+        return null;
+      }
+      return data;
+    }catch(e){ console.error(e); return null; }
+  }
+
+  function clearLastResult(){
+    try{ localStorage.removeItem(LAST_RESULT_KEY); }catch(e){ console.error(e); }
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', async ()=>{
     validationMsg.style.display = 'none';
+
+    if(!privateKey){
+      validationMsg.textContent = 'この端末に秘密鍵が登録されていないため、内容を復号できません。「暗号鍵の設定」で秘密鍵を貼り付けてください。';
+      validationMsg.style.display = 'block';
+      resultsSection.style.display = 'none';
+      return;
+    }
+
+    // Re-decrypt fresh in case submissions came in after the last load.
+    await loadSubmissions();
 
     const sessionMin = Number(document.getElementById('sessionMinutes').value) || 0;
     const feedbackMin = Number(document.getElementById('feedbackMinutes').value) || 0;
 
-    const usable = sessionStudents
-      .filter(s => s.name && s.name.trim() && s.program_id)
+    const usable = decryptedSubmissions
+      .filter(s => !s.decryptFailed && s.name && s.name.trim() && s.program_id)
       .map(s => {
         const p = programs.find(x=>x.id===s.program_id);
         return { id: s.id, name: s.name.trim(), programId: s.program_id, programName: p ? p.name : '', duration: p ? p.duration : 0, programTagIds: p ? (p.tag_ids||[]) : [], noSplit: p ? !!p.no_split : false, ng: new Set(s.ng_tag_ids||[]) };
@@ -1162,8 +1482,11 @@
     // total time-overage (and, secondarily, the fewest NG conflicts).
     const { groups, leftover } = buildBestGrouping(usable, feedbackMin, sessionMin, 60);
 
-    const payload = { groups, leftover, sessionMin, feedbackMin };
-    renderResultsFromPayload(payload, new Date().toISOString());
+    const classDate = teacherViewDateInput.value || todayStr();
+    const generatedAtIso = new Date().toISOString();
+    const payload = { groups, leftover, sessionMin, feedbackMin, classDate };
+    saveLastResult(classDate, generatedAtIso, payload);
+    renderResultsFromPayload(payload, generatedAtIso);
   });
 
   function renderResultsFromPayload(payload, generatedAtIso){
@@ -1172,7 +1495,8 @@
     if(teacherOffHint) teacherOffHint.style.display = 'none';
     if(generatedAtIso){
       const d = new Date(generatedAtIso);
-      resultsGeneratedAt.textContent = `生成日時：${d.toLocaleString('ja-JP')}`;
+      const dateLabel = payload.classDate ? `対象日：${payload.classDate}　／　` : '';
+      resultsGeneratedAt.textContent = `${dateLabel}生成日時：${d.toLocaleString('ja-JP')}`;
     }
 
     const pairGroups = groups.filter(g=>g.kind==='pair');
@@ -1330,9 +1654,17 @@
   // use the manual refresh buttons if another device changed the data.
   (async function init(){
     if(!supabaseReady) return;
+    // If pairs were generated earlier on this device, show that class date again
+    // so the roster and the pairs on screen belong together.
+    const last = loadLastResult();
+    if(last) teacherViewDateInput.value = last.date;
+
     await loadTags();
     await loadPrograms();
-    renderRoster();
+    await loadAppSettings();
+    await loadSubmissions();
+
+    if(last) renderResultsFromPayload(last.payload, last.generatedAtIso);
   })();
 </script>
 
